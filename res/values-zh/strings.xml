@@ -6,4 +6,5 @@
 	<string name="str_process">进度：</string>
 	<string name="str_exit">确定要退出吗?</string>	
 	<string name="str_warning">警告</string>
+	<string name="str_fail_time">失败: </string>
 </resources>

@@ -6,4 +6,5 @@
 	<string name="str_process">Process:</string>
 	<string name="str_exit">Are you sure to EXIT?</string>
 	<string name="str_warning">WARNING</string>
+	<string name="str_fail_time">Fail: </string>
 </resources>

@@ -14,7 +14,16 @@
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
             android:layout_alignParentTop="true"
-            android:text="@string/str_pass" android:gravity="center"/>
+            android:text="@string/str_fail" android:gravity="center"/>
+
+        <TextView
+            android:id="@+id/view_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="65dp"
+            android:text="@string/str_fail_time" android:visibility="invisible"/>
 
     </RelativeLayout>
 

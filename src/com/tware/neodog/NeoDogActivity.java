@@ -19,6 +19,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
@@ -32,10 +33,12 @@ public class NeoDogActivity extends Activity {
 	private static final int  PROCESS_EXISTS 	= 1;
 	private static final int  TIMER_RUNNING 	= 2;
 	private static final int  RUNIN_PASS	 	= 3;
-	private static final int  RUNINTIME			= 720;
 	private static final String TAG = "NeoDog";
 	private static final String LOGPATH	= "/sdcard/NeoDog.txt";
-	private static final String PROCNAME= "com.qualcomm.qx.neocore";
+	private static final String cfg_path= "/sdcard/neodog.cfg";
+	private static String 	PROCNAME= "com.qualcomm.qx.neocore";
+	private static String 	PROCPACK= "com.qualcomm.qx.neocore.Neocore";
+	private static int  	RUNINTIME= 720;
 	
 	private List<RunningAppProcessInfo> mListAppInfo = null;
 	private SimpleDateFormat now = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -43,6 +46,7 @@ public class NeoDogActivity extends Activity {
 	private Timer timer = new Timer();
 	private TimerTask task;
 	private TextView vStat;
+	private TextView vFailTime;
 	private Handler handler;
 	private int duration = 0;
 	
@@ -52,10 +56,39 @@ public class NeoDogActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
         
-        vStat = (TextView)findViewById(R.id.view_status);
+        vStat 		= (TextView)findViewById(R.id.view_status);
+        vFailTime 	= (TextView)findViewById(R.id.view_time);
         
         am = (ActivityManager )getSystemService(Context.ACTIVITY_SERVICE);
         
+        if (!Environment.getExternalStorageState().equalsIgnoreCase(Environment.MEDIA_MOUNTED))
+        {
+        	Log.e(TAG, "Media not ready yet.");
+        	Toast.makeText(getApplicationContext(), "Media not ready yet!", Toast.LENGTH_LONG).show();
+        	System.exit(1);
+        }
+        
+        /* here to loading config from /sdcard/ */
+        loadConfig cfg = new loadConfig();
+        if (cfg.init(cfg_path))
+        {
+        	if(cfg.getRuninTime() != 0)
+        	{
+        		RUNINTIME 	= cfg.getRuninTime();
+        	}
+        	if (cfg.getProcessName() != null && cfg.getProcessPack() != null)
+        	{
+        		PROCNAME	= cfg.getProcessName();
+        		PROCPACK	= cfg.getProcessPack();
+        	}
+        }else{
+        	Log.e(TAG, "Loading config file failed. Using default settings.");
+        }
+        
+        Toast.makeText(getApplicationContext(), 
+        		"Runin: " + RUNINTIME*10 + "s" + "\nProcName: " + PROCNAME+"\nProcPack: " + PROCPACK,
+        		Toast.LENGTH_LONG)
+        		.show();
         
         task = new TimerTask(){
 			@Override
@@ -81,24 +114,47 @@ public class NeoDogActivity extends Activity {
         	{
         		switch(msg.what){
         			case PROCESS_NOT_FOUND:
-    					logToFile(LOGPATH, PROCNAME, "stoped ");
-    					
+    					killTimer();
+    					logToFile(LOGPATH, PROCNAME, "stoped "); 					
     					vStat.setVisibility(View.VISIBLE);
+    					vFailTime.setVisibility(View.VISIBLE);
     					vStat.setTextSize(100);
     					vStat.setBackgroundColor(Color.RED);
     					vStat.setText(R.string.str_fail);
-    					Toast.makeText(getApplicationContext(), PROCNAME + "has stoped yet!", Toast.LENGTH_LONG).show();
-    					if (timer != null)
+    					int hour = 0;
+    					int min	 = 0;
+    					int sec	 = 0;
+    					int duration1 = duration * 10; /* get back to sec */
+    					if (duration1 >= 3600)
     					{
-    						timer.cancel();
-    						timer = null;
+    						hour = duration1/360;
+    						if (duration1%360 >= 60)
+    						{
+    							min	 = (duration1%360)/60;
+    							sec  = (duration1%360)%60;
+    						}else{
+    							sec  = duration1%360;
+    						}
+    					}else if (duration1 >= 60 && duration1 < 3600){
+    						hour = 0;
+    						min	 = duration1/60;
+    						sec	 = duration1%60;
+    					}else{
+    						hour = 0;
+    						min	 = 0;
+    						sec	 = duration1;
     					}
+    					vFailTime.setTextColor(Color.WHITE);    					
+    					vFailTime.setText(getResources().getString(R.string.str_fail_time) + " " + hour +":"+ min + ":" +sec);
+    					Toast.makeText(getApplicationContext(),
+    							PROCNAME + "has stoped yet!", Toast.LENGTH_LONG).show();
         				break;
         		
         			case PROCESS_EXISTS:
     					logToFile(LOGPATH, PROCNAME, "running");
     					Toast.makeText(getApplicationContext(), 
-    							getResources().getString(R.string.str_process) + (int)(((float)duration/RUNINTIME)*100) +"%",
+    									getResources().getString(R.string.str_process)+ " " + 
+    									(int)(((float)duration/RUNINTIME)*100) +"%",
     								Toast.LENGTH_LONG).show();
         				break;
         				
@@ -107,11 +163,8 @@ public class NeoDogActivity extends Activity {
         				break;
         			
         			case RUNIN_PASS:
-    					if (timer != null)
-    					{
-    						timer.cancel();
-    						timer = null;
-    					}
+        				killTimer();
+    					logToFile(LOGPATH, "Runin", "PASS ");
     					vStat.setVisibility(View.VISIBLE);
     					vStat.setTextSize(100);
     					vStat.setBackgroundColor(Color.GREEN);
@@ -119,8 +172,8 @@ public class NeoDogActivity extends Activity {
     					Intent i = new Intent();
         				i.setFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
         				i.setClass(getApplicationContext(), NeoDogActivity.class);
-        				startActivity(i);        				
-        				break;       				
+        				startActivity(i);
+    					break;       				
         		}
         	}
         };
@@ -128,13 +181,13 @@ public class NeoDogActivity extends Activity {
 		try{
 			timer.schedule(task, 7000, 10000);
 			Intent i = new Intent();
-			i.setClassName("com.qualcomm.qx.neocore", "com.qualcomm.qx.neocore.Neocore");
+			i.setClassName(PROCNAME, PROCPACK);
 			Log.d(TAG, "neocore started");
 			startActivity(i);
 		}catch(ActivityNotFoundException e)
 		{
-			Log.d(TAG, "neocore not found");
-			Toast.makeText(getApplicationContext(), "neocore not found", Toast.LENGTH_LONG).show();
+			Log.d(TAG, PROCNAME + " not found");
+			Toast.makeText(getApplicationContext(), PROCNAME + " not found", Toast.LENGTH_LONG).show();
 			return;
 		}	
     }
@@ -159,6 +212,17 @@ public class NeoDogActivity extends Activity {
         int size = mListAppInfo.size();
         for (int i=0; i< size; i++)
         {
+        	if (mListAppInfo.get(i).processName.equalsIgnoreCase(this.getPackageName()))
+        	{
+        		if (mListAppInfo.get(i).importance == RunningAppProcessInfo.IMPORTANCE_FOREGROUND)
+        		{
+            		Log.e(TAG, "Fail reason: NeoDog has become Foreground without Pass!");
+        			killTimer();
+            		handler.sendEmptyMessage(PROCESS_NOT_FOUND);
+        			return false;
+        		}
+        	}
+        	
         	if (mListAppInfo.get(i).processName.equalsIgnoreCase(procName))
         	{
         		Log.e(TAG, "Found Process " + procName);
@@ -203,6 +267,16 @@ public class NeoDogActivity extends Activity {
 		return true;
     }
     
+    public void killTimer()
+    {
+		if (timer != null)
+		{
+			Log.i(TAG, "Timer had stoped!");
+			timer.cancel();
+			timer = null;
+		}
+    }
+    
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) { 
     	if (keyCode == KeyEvent.KEYCODE_BACK && event.getRepeatCount() == 0)
@@ -213,7 +287,7 @@ public class NeoDogActivity extends Activity {
     		.setPositiveButton("Ok", new DialogInterface.OnClickListener(){
     			public void onClick(DialogInterface dialog, int whichButton)
     			{
-    				System.exit(0);
+    				finish();
     			}
     		})
     		.setNegativeButton("Cancel", new DialogInterface.OnClickListener(){
@@ -229,4 +303,12 @@ public class NeoDogActivity extends Activity {
 		return false;
     }
     
+    @Override
+    public void onDestroy()
+    {
+    	super.onDestroy();
+    	Log.d(TAG, "onDestory()");
+		killTimer();  
+    	System.exit(0);
+    }
 }

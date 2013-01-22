@@ -1,7 +1,12 @@
 v1.0.1 @ 2012-01-22
-
+	*) add neodog.cfg config file support
+	*) add more loading tips
+	*) add fail time @ fail page
+	*) change onDestory() function to cancel timer
+	
 v1.0.0 @ 2012-01-21
 	*) first relase for Runin Test 
 	*) auto log to /sdcard/NeoDog.txt
 	*) default runin time is 2H
 	*) sign with a DOG icon
+	
