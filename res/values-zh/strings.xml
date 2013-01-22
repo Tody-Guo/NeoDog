@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="str_pass">通过</string>
+    <string name="str_fail">失败</string>
+    <string name="app_name">烧机看门狗</string>
+	<string name="str_process">进度：</string>
+	<string name="str_exit">确定要退出吗?</string>	
+	<string name="str_warning">警告</string>
+</resources>
